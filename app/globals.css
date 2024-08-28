@@ -1,14 +1,157 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-jost), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+  --color-ivory: #f4efe8;
+  --color-stone: #e7e0d6;
+  --color-ink: #1b1714;
+  --color-muted: #7a6f64;
+  --color-gold: #a8875a;
+}
+
 :root {
-  --background: #000;
   overflow-x: hidden;
 }
 
 body {
-  background: var(--background);
+  background: var(--color-ivory);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: var(--color-ink);
+  color: var(--color-ivory);
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--color-gold);
+  outline-offset: 3px;
 }
 
 @utility hover-animation {
-  @apply cursor-pointer opacity-75 hover:opacity-100 transition-opacity duration-100;
+  @apply cursor-pointer opacity-75 hover:opacity-100 transition-opacity duration-200;
+}
+
+@utility eyebrow {
+  @apply text-[10px] md:text-[11px] uppercase tracking-[0.32em] text-muted;
+}
+
+@utility btn-primary {
+  @apply inline-flex items-center justify-center gap-2 bg-ink px-8 py-3.5 text-[11px] font-medium uppercase tracking-[0.28em] text-ivory transition-[background-color,transform] duration-300 hover:bg-gold active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none;
+}
+
+@utility btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 border border-ink/25 px-6 py-3 text-[11px] font-medium uppercase tracking-[0.28em] text-ink transition-colors duration-300 hover:border-ink hover:bg-ink hover:text-ivory;
+}
+
+@utility panel {
+  @apply bg-ivory/85 backdrop-blur-xl border border-ink/10;
+}
+
+.sr-only-focusable:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* fabric note card */
+@keyframes note-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.note-in {
+  animation: note-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* size guide dialog */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+.size-guide[open] {
+  animation: dialog-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.size-guide[open]::backdrop {
+  animation: backdrop-in 0.4s ease;
+}
+
+/* page transitions: every page arrives under an ivory veil that lifts */
+@keyframes veil-lift {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+.page-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: var(--color-ivory);
+  pointer-events: none;
+  animation: veil-lift 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.08s forwards;
+}
+.leave-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: var(--color-ivory);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease 0.3s;
+}
+.leave-veil[data-on="true"] {
+  opacity: 1;
+}
+
+/* home: the active dash fills while a piece waits for autoplay */
+@keyframes autoplay-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.autoplay-fill {
+  animation-name: autoplay-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+/* letter-by-letter reveal */
+.reveal-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+.reveal-char {
+  display: inline-block;
+  animation: char-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes char-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em) rotate(5deg);
+    filter: blur(5px);
+  }
 }
