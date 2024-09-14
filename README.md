@@ -2,122 +2,161 @@
 
 *A salon of turning silk and tweed, lit like a studio shoot.*
 
-Maison Orvelle is a 3D boutique for women's tops. It sells eight pieces in two
-collections, Soirée and Riviera, and every one of them is a real 3D model
-rendered live in WebGL rather than a photograph. What follows is mostly a walk
-through how that rendering works, because that is where most of the work went.
+![Next.js](https://img.shields.io/badge/Next.js-15.5-000000?logo=nextdotjs&logoColor=white)
+![Three.js](https://img.shields.io/badge/Three.js-0.180-000000?logo=threedotjs&logoColor=white)
+![React Three Fiber](https://img.shields.io/badge/React_Three_Fiber-9_+_drei_10-1b1714)
+![Backend](https://img.shields.io/badge/backend-none_needed-a8875a)
 
-## Rendering notes
+Maison Orvelle is a 3D boutique for women's tops. Every piece turns live in
+WebGL, on a ring of plinths in a Parisian salon and on its own product stage,
+with colourways, fabric notes, a bag and a demo checkout.
 
-Everything starts with a single canvas. The root layout mounts one fixed
-`<Canvas>` from React Three Fiber, and each page places drei `<View>`s that
-render into it inside their own rectangles. This matters more than it sounds:
-the shop shows all eight pieces at once, each on its own small turntable
-against its own tint, and with one canvas per card the browser would have to
-open eight WebGL contexts. With views, the eight cards share one. A small
-`ClearEachFrame` pass wipes the canvas before the views draw, so nothing
-smears behind when you scroll the shop, where pieces also turn faster when you
-hover them and every card carries a saved-piece heart and a quick add to bag.
+## The experience
 
-```tsx
-<Canvas
-  style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none" }}
-  dpr={[1, 2]}
-  gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
->
-  <ClearEachFrame />
-  <AssetsPreload />
-  <Suspense fallback={<SuspenseSignal />}>
-    <View.Port />
-  </Suspense>
-</Canvas>
+You arrive in an atelier. The current collection stands on a ring of stone
+plinths with brass rods, on a polished marble floor in front of a panelled
+salon wall, beneath a brass arch. The front piece turns slowly on its own.
+Every few seconds the ring eases round to bring the next piece forward, and
+after the last one the atelier moves on to the other collection.
+
+A warm light follows your mouse through the room, so satin and marble catch
+the glow. Click a piece to bring it forward; click it again and the camera
+glides up to it before an ivory veil falls and its page opens. On a phone,
+swipe left and right, and one piece fills the arch.
+
+Nothing here is a photograph. Each top is a real 3D model lit like a studio
+shoot, and the salon itself, down to the gilded cornice and the veined marble,
+is drawn in Three.js. The palette is five quiet tokens, ivory `#f4efe8`, stone
+`#e7e0d6`, ink `#1b1714`, muted `#7a6f64` and gold `#a8875a`, set in Cormorant
+for titles and Jost for text. Reduced motion stops the autoplay and the camera
+glide.
+
+A short visit, if you like: let the ring turn once, switch to **Riviera** with
+the button under the collection title, open a piece, drag it round, tap a gold
+dot, try another colourway and a size, then add it to the bag and walk through
+the checkout. Nothing is charged and nothing is sent.
+
+## Collections & shop
+
+Eight tops in two collections:
+
+| Collection | Mood | Fabrics |
+| --- | --- | --- |
+| **Soirée** | Evening | Tweed, satin, brocade, patent leather |
+| **Riviera** | Colour | Nappa leather, patchwork, taffeta, painted silk |
+
+**The shop.** Every card is a small turntable against its own tint, turning
+faster when you hover it. Search ignores accents, so "soiree" finds Soirée,
+and matches names, fabrics, colourways and details. Filters cover collection,
+fabric, colour family and price band, and only offer options that match at
+least one piece. Each card has a saved-piece heart and a quick add to bag.
+
+**The product page.** The piece gets the whole page, with a floating purchase
+panel beside it. Drag to turn it. Gold dots sit on the garment itself; tap
+one, or its chip below, for a fabric note, and the piece turns to face you.
+Colourways re-dye the real fabric texture, so weave, print and shine stay
+intact. A size guide opens a measurement chart, with the waist column
+highlighted for corsetry, and "Complete the look" suggests pieces from the
+same collection.
+
+**Bag, saved pieces and checkout.** The bag slides in from the right over a
+blurred page, keeps one line per piece, size and colourway, and survives
+reloads. Saved pieces have their own page. The checkout has contact and
+shipping fields, an order summary with shipping and estimated tax, and a clear
+notice that it is a demo. No payment details are asked for and no order is
+sent anywhere.
+
+**And the small things.** An Info page holds shipping, returns, privacy and
+the 3D model credits. Quiet ambient sound fades in on your first interaction,
+with a mute toggle that is remembered. Pages change under an ivory veil, a
+loading skeleton waits while models arrive, and even the 404 is dressed for
+the occasion.
+
+All products and prices are fictional and in USD.
+
+## Under the hood
+
+- **One canvas, many views.** A single fixed WebGL canvas lives in the root
+  layout; pages place drei `<View>`s into it, so eight shop cards share one
+  context.
+- **Colourways in a shader.** `makeRecolorable` keeps each pixel's brightness
+  and swaps its hue, normalised by the cloth's average brightness. Silver
+  buckles, lace and metal parts are left undyed.
+- **Per-instance materials.** The same piece can be dyed on its page and keep
+  its own colour on the ring and in the bag.
+- **A ring that takes the short way.** `easing.dampAngle` from maath eases
+  every turn.
+- **Hotspots pinned to the cloth.** A ray finds the garment's surface at load,
+  so each gold dot sits just proud of the fabric.
+- **A marble floor with no image.** Painted on a canvas at run time with a
+  seeded generator.
+- **Light models.** Eight Draco-compressed glTF garments in about 3 MB, with a
+  self-hosted decoder.
+- **Patient autoplay.** It pauses on hover and in hidden tabs, and waits
+  longer after a manual choice.
+- **Loading without a spinner.** A small store counts suspended views, and the
+  page keeps its skeleton until every model and texture is ready.
+- **No backend.** The catalogue is typed static data in `lib/products.ts`; the
+  bag and saved pieces live in `localStorage`.
+
+The ring itself is one line of easing, run every frame:
+
+```ts
+// components/three/AtelierScene.tsx
+useFrame((_, delta) => {
+  if (ring.current) easing.dampAngle(ring.current.rotation, "y", -(active / count) * Math.PI * 2, 0.45, delta);
+  // ...then the camera eases to its resting place, or glides up to the chosen piece
+});
 ```
 
-The models themselves are glTF files with Draco compression, eight garments in
-about 3 MB, decoded by a self-hosted decoder so nothing depends on a
-third-party CDN. The garments are based on 3D models shared under CC BY 4.0;
-each model's title and author are listed on the Info page and in
-`lib/products.ts`, and the models were compressed for the web and renamed for
-the store. Loading is handled by a tiny external store that counts suspended
-views through a `SuspenseSignal` inside the canvas, and the page shows a
-skeleton until every model and texture is ready, rather than dropping a
-spinner on top of a half-built scene.
+Built with Next.js 15.5, React 19.1, TypeScript 5, Three.js 0.180, React Three
+Fiber 9, drei 10, GSAP 3.13 and Tailwind CSS 4.
 
-The home page is the atelier, and it is built entirely in Three.js. There is a
-plaster wall with panel mouldings, pilasters, a dado rail and a gilded
-cornice, a brass arch, and stone plinths with gold rings standing on a
-polished marble floor. The marble is not an image: `marbleTexture()` paints
-cloudy ground, soft and sharp veins and tile joints onto a canvas with a
-seeded random generator, so the floor looks the same on every visit and costs
-no download at all. Lighting comes from a shared room environment map,
-generated locally with no HDR download, plus a warm key light, with contact
-shadows under each stand. A warm light also follows the mouse through the
-room, so satin and marble catch the glow.
-
-The collection stands on a ring of four plinths. The ring eases to `-(active /
-count) · 2π` with `easing.dampAngle`, which means it always takes the short
-way round, and only the front piece turns on its own turntable while the
-others ease back to face forward. Autoplay moves the ring every 5.5 seconds
-and moves on to the next collection after the last piece. It waits longer
-after a manual choice, pauses while a piece is hovered or the tab is hidden,
-and is switched off entirely with reduced motion. There are previous and next
-buttons, a progress dash that fills while a piece waits its turn, swipe on
-touch screens, and a custom cursor ring that reads "Select" or "View" over the
-pieces. Clicking a piece brings it forward; clicking again glides the camera
-up to it before an ivory veil falls and the product page loads.
-
-The product page gives each piece a full stage with drag to turn, using
-PresentationControls. Fabric notes are gold dots on the garment itself. They
-are stored as fractions of the piece's height, and at load `ProductStage`
-casts a ray at the front of the garment and keeps the first surface it hits,
-so each dot sits just proud of the cloth whatever shape the model is. Tapping
-a dot, or its chip below the piece for keyboard and touch, opens the note,
-turns the piece with `dampAngle` until that dot faces the camera, and moves
-the camera in. There is also size selection with a nudge if you forget, a size
-guide with the waist column highlighted for corsetry, a details list and a
-"Complete the look" row from the same collection.
-
-Colourways are the part I am fondest of. `makeRecolorable` patches each
-garment material's fragment shader through `onBeforeCompile`. It keeps every
-pixel's brightness, swaps its hue for the chosen colour and normalises by the
-cloth's average brightness, measured once from a 24×24 downsample, so a pale
-tweed and a dark brocade both dye to a true colour while weave, print and
-shine stay intact. With `protectNeutrals`, low-saturation pixels such as
-silver buckles and lace keep their original colour, and solid metal parts are
-detected and never dyed at all. `TopModel` clones each model's materials per
-instance, so the same piece can be dyed coral on its product page while it
-keeps its own colour in the bag thumbnail and on the ring.
-
-Around all of this sit the ordinary parts of a shop. Search ignores accents,
-so "soiree" finds Soirée, and matches names, fabrics, colourways and details;
-filters cover collection, fabric, colour family and price band and only show
-options that match at least one piece, with sorting by price and an empty
-state that clears the filters. The bag slides in from the right over a blurred
-page and keeps one line per piece, size and colourway; saved pieces have their
-own page; both live in `localStorage` as `orvelle-bag` and `orvelle-saved`.
-The demo checkout has contact and shipping fields, an order summary with
-shipping and estimated tax, and says plainly that it is a demo. There is also
-an Info page for shipping, returns, privacy and model credits, quiet ambient
-sound with a remembered mute toggle, and a custom 404.
-
-On phones the camera pulls back so one piece fills the arch, the controls
-stack underneath and swiping turns the ring. The palette is five tokens, ivory
-`#f4efe8`, stone `#e7e0d6`, ink `#1b1714`, muted `#7a6f64` and gold `#a8875a`,
-with Cormorant for display titles and Jost for body text. There is no dark
-mode.
-
-The stack is Next.js 15.5 with Turbopack, React 19.1, TypeScript 5, Three.js
-0.180, React Three Fiber 9, drei 10, maath, GSAP 3.13 and Tailwind CSS 4.
-
-## Run
+## Run locally
 
 You will need Node.js 20 or newer and a browser with WebGL 2.
 
 ```bash
+git clone <repository-url> maison-orvelle
+cd maison-orvelle
 npm install
 npm run dev
 ```
 
-Then open http://localhost:3000. `npm run build` and `npm start` for
-production, `npm run lint` for ESLint. No environment variables, keys or
-database are needed.
+Then open http://localhost:3000. No environment variables, keys or database
+are needed.
+
+| Script | What it does |
+| --- | --- |
+| `npm run dev` | Dev server with Turbopack |
+| `npm run build` | Production build |
+| `npm start` | Serve the production build |
+| `npm run lint` | ESLint |
+
+Where the pieces live:
+
+```text
+app/
+  page.tsx                 the atelier
+  shop/ · product/[slug]/ · wishlist/ · checkout/ · info/
+components/
+  three/AtelierScene.tsx   salon wall, arch, marble floor and the ring
+  three/ProductStage.tsx   product stage with hotspots
+  three/CardStage.tsx      small turntable for shop cards
+  three/Studio.tsx         TopModel, studio lights, recolour shader
+  ViewCanvas.tsx           the single shared WebGL canvas
+lib/
+  products.ts              pieces, colourways, hotspots, credits
+  cart.tsx · wishlist.tsx  bag and saved pieces
+public/models/tops/        eight Draco-compressed glTF garments
+```
+
+Models, the Draco decoder, fonts and audio are all served from `public/`, so
+it deploys to Vercel or any Node host with no external CDN.
+
+## Credits
+
+The garments are based on 3D models shared under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Each model's title
+and author are listed on the Info page and in `lib/products.ts`; the models
+were compressed for the web and renamed for this store.
